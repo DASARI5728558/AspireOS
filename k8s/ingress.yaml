@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aspireos
+  namespace: aspireos
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod   # remove if not using cert-manager
+spec:
+  ingressClassName: nginx   # adjust to whatever ingress controller your cluster provides
+  tls:
+    - hosts: ["aspireos.com"]
+      secretName: aspireos-tls
+  rules:
+    - host: aspireoscom
+      http:
+        paths:
+          # Backend already serves its routes under /api/v1 (see backend/app/api/routes.py),
+          # and the frontend is built with VITE_API_URL=/api/v1, so no path rewriting needed.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: {name: backend, port: {number: 8000}}
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: frontend, port: {number: 80}}
