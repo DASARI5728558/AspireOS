@@ -75,7 +75,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: AspireOS
+          username: asperiondigital
           password: ${{ secrets.UTHO_API_TOKEN }}
 
       - name: Set up Docker Buildx
