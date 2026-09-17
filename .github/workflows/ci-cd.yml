@@ -76,7 +76,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: asperiondigital@gmail.com
-          password: ${{ secrets.UTHO_API_TOKEN }}
+          password: HvEM7jwZF6cL!
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
