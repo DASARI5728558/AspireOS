@@ -11,9 +11,7 @@ resources:
   - backend.yaml
   - frontend.yaml
   - ingress.yaml
-  # secret.example.yaml is intentionally NOT listed here — create the real
-  # Secret separately (kubectl or your CI/CD secret manager). See README.md.
-
+  
 images:
   - name: registry.utho.com/yourorg/aspireos-backend
     newTag: latest
