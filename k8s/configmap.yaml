@@ -4,7 +4,7 @@ metadata:
   name: aspireos-config
   namespace: aspireos
 data:
-  APP_ENV: "production"
+  APP_ENV: "devolpment"
   REDIS_URL: "redis://redis:6379/0"
   CORS_ORIGINS: "https://aspireos.example.com"
   ACCESS_TOKEN_MINUTES: "30"
