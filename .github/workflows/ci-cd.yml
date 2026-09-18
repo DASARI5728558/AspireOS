@@ -115,7 +115,7 @@ jobs:
     timeout-minutes: 10
 
     environment:
-      name: production
+      name: dev
 
     steps:
       - name: Checkout
@@ -132,6 +132,8 @@ jobs:
       - name: Configure Kubernetes
         run: |
           mkdir -p "$HOME/.kube"
+          echo "Length of secret before decoding:"
+          echo -n "${{ secrets.KUBE_CONFIG_B64 }}" | wc -c
           echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d --ignore-garbage > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
 
@@ -139,6 +141,9 @@ jobs:
         run: |
           echo "Kubeconfig file size (bytes):"
           wc -c < "$HOME/.kube/config"
+          echo "First 200 characters of decoded file:"
+          head -c 200 "$HOME/.kube/config"
+          echo ""
           echo "Kubeconfig contexts:"
           kubectl config get-contexts --kubeconfig="$HOME/.kube/config" || true
 
