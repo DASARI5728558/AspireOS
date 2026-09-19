@@ -6,7 +6,7 @@ metadata:
 data:
   APP_ENV: "devolpment"
   REDIS_URL: "redis://redis:6379/0"
-  CORS_ORIGINS: "https://aspireos.example.com"
+  CORS_ORIGINS: "https://aspireos.com"
   ACCESS_TOKEN_MINUTES: "30"
   DIGEST_TIMEZONE: "Asia/Kolkata"
   POSTGRES_DB: "aspireos"
