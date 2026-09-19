@@ -11,9 +11,19 @@ resources:
   - backend.yaml
   - frontend.yaml
   - ingress.yaml
-  
+
 images:
-  - name: registry.utho.com/asperiondigital/aspireos-backend
+  - name: registry.utho.io/asperiondigital/aspireos-backend
     newTag: latest
-  - name: registry.utho.com/asperiondigital/aspireos-frontend
+  - name: registry.utho.io/asperiondigital/aspireos-frontend
     newTag: latest
+
+patches:
+  - target:
+      kind: Deployment
+      name: "backend|frontend"
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: utho-registry
