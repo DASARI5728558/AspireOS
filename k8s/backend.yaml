@@ -17,7 +17,7 @@ spec:
       containers:
         - name: backend
           # placeholder tag; CI/CD overwrites this with `kustomize edit set image`
-          image: registry.utho.io/asperiondigital/aspireos-backend:latest
+          image: registry.utho.io/asperiondigital/aspireos-backend:945e0e92ae18
           ports: [{containerPort: 8000}]
           envFrom:
             - configMapRef: {name: aspireos-config}
