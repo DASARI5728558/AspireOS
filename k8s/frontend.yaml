@@ -17,7 +17,7 @@ spec:
       containers:
         - name: frontend
           # placeholder tag; CI/CD overwrites this with `kustomize edit set image`
-          image: registry.utho.io/asperiondigital/aspireos-frontend:latest
+          image: registry.utho.io/asperiondigital/aspireos-frontend:945e0e92ae18
           ports: [{containerPort: 80}]
           readinessProbe:
             httpGet: {path: /, port: 80}
