@@ -11,3 +11,4 @@ data:
   DIGEST_TIMEZONE: "Asia/Kolkata"
   POSTGRES_DB: "aspireos"
   POSTGRES_USER: "aspireos"
+  PGDATA: "/var/lib/postgresql/data/pgdata"
