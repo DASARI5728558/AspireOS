@@ -14,9 +14,9 @@ resources:
 
 images:
   - name: registry.utho.io/asperiondigital/aspireos-backend
-    newTag: latest
+    newTag: 945e0e92ae18
   - name: registry.utho.io/asperiondigital/aspireos-frontend
-    newTag: latest
+    newTag: 945e0e92ae18
 
 patches:
   - target:
