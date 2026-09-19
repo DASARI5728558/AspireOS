@@ -12,6 +12,8 @@ spec:
     metadata:
       labels: {app: backend}
     spec:
+      imagePullSecrets:       
+        - name: utho-registry
       containers:
         - name: backend
           # placeholder tag; CI/CD overwrites this with `kustomize edit set image`
