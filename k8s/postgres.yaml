@@ -23,6 +23,7 @@ spec:
               valueFrom: {configMapKeyRef: {name: aspireos-config, key: POSTGRES_USER}}
             - name: POSTGRES_PASSWORD
               valueFrom: {secretKeyRef: {name: aspireos-secrets, key: POSTGRES_PASSWORD}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
           volumeMounts:
             - {name: postgres-data, mountPath: /var/lib/postgresql/data}
           readinessProbe:
