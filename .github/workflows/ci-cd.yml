@@ -13,7 +13,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel superseded PR runs only; never kill a deploy that is mid-rollout
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   REGISTRY: registry.utho.io
@@ -58,7 +59,6 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
 
     outputs:
       tag: ${{ steps.image-tag.outputs.tag }}
@@ -112,10 +112,14 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     environment:
       name: dev
+
+    env:
+      NAMESPACE: aspireos
+      IMAGE_TAG: ${{ needs.build-and-push.outputs.tag }}
 
     steps:
       - name: Checkout
@@ -126,39 +130,82 @@ jobs:
 
       - name: Install Kustomize
         run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s 5.4.3
           sudo mv kustomize /usr/local/bin/kustomize
+          kustomize version
 
+      # Secret goes through env, not inline ${{ }}, so it never appears in the script text
       - name: Configure Kubernetes
+        env:
+          KUBE_CONFIG_B64: ${{ secrets.KUBE_CONFIG_B64 }}
         run: |
           mkdir -p "$HOME/.kube"
-          echo "Length of secret before decoding:"
-          echo -n "${{ secrets.KUBE_CONFIG_B64 }}" | wc -c
-          echo "${{ secrets.KUBE_CONFIG_B64 }}" | base64 -d --ignore-garbage > "$HOME/.kube/config"
+          echo "$KUBE_CONFIG_B64" | base64 -d --ignore-garbage > "$HOME/.kube/config"
           chmod 600 "$HOME/.kube/config"
+          kubectl config current-context
+          kubectl get nodes
 
-      - name: Debug kubeconfig
+      # Creates/updates the pull secret from the same GitHub secrets used for docker push.
+      # Idempotent, so it is safe on every run and picks up rotated credentials.
+      - name: Ensure namespace and registry pull secret
+        env:
+          REGISTRY_USER: ${{ secrets.UTHO_REGISTRY_USERNAME }}
+          REGISTRY_PASS: ${{ secrets.UTHO_REGISTRY_PASSWORD }}
         run: |
-          echo "Kubeconfig file size (bytes):"
-          wc -c < "$HOME/.kube/config"
-          echo "First 200 characters of decoded file:"
-          head -c 200 "$HOME/.kube/config"
-          echo ""
-          echo "Kubeconfig contexts:"
-          kubectl config get-contexts --kubeconfig="$HOME/.kube/config" || true
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl -n "$NAMESPACE" create secret docker-registry utho-registry \
+            --docker-server="$REGISTRY" \
+            --docker-username="$REGISTRY_USER" \
+            --docker-password="$REGISTRY_PASS" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
+      # NOTE: the image name on the LEFT must match the `image:` field in k8s/*.yaml
+      # (ignoring the tag), otherwise kustomize silently changes nothing.
       - name: Update image tags
         working-directory: k8s
+        env:
+          BACKEND_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE }}
+          FRONTEND_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE }}
         run: |
           kustomize edit set image \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE }}:${{ needs.build-and-push.outputs.tag }} \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE }}:${{ needs.build-and-push.outputs.tag }}
+            "$BACKEND_REF=$BACKEND_REF:$IMAGE_TAG" \
+            "$FRONTEND_REF=$FRONTEND_REF:$IMAGE_TAG"
+
+      # Fail fast with a clear message instead of a 3-minute rollout timeout
+      - name: Verify rendered manifests
+        env:
+          BACKEND_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.BACKEND_IMAGE }}
+          FRONTEND_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ env.FRONTEND_IMAGE }}
+        run: |
+          RENDERED="$(kustomize build k8s)"
+          echo "Images that will be deployed:"
+          grep 'image:' <<< "$RENDERED"
+
+          for ref in "$BACKEND_REF:$IMAGE_TAG" "$FRONTEND_REF:$IMAGE_TAG"; do
+            if ! grep -q "$ref" <<< "$RENDERED"; then
+              echo "::error::Rendered manifests do not contain $ref. Set the image: field in k8s/ to ${ref%:*} (any tag)."
+              exit 1
+            fi
+          done
+
+          if ! grep -q "utho-registry" <<< "$RENDERED"; then
+            echo "::error::No imagePullSecrets named utho-registry found in the rendered manifests."
+            exit 1
+          fi
 
       - name: Deploy
-        run: kubectl apply -k k8s --kubeconfig="$HOME/.kube/config"
+        run: kubectl apply -k k8s
 
       - name: Wait for backend
-        run: kubectl -n aspireos rollout status deployment/backend --timeout=180s --kubeconfig="$HOME/.kube/config"
+        run: kubectl -n "$NAMESPACE" rollout status deployment/backend --timeout=300s
 
       - name: Wait for frontend
-        run: kubectl -n aspireos rollout status deployment/frontend --timeout=180s --kubeconfig="$HOME/.kube/config"
+        run: kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=300s
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          kubectl -n "$NAMESPACE" get pods -o wide || true
+          kubectl -n "$NAMESPACE" get events --sort-by=.lastTimestamp | tail -n 40 || true
+          kubectl -n "$NAMESPACE" describe pods | grep -E "^Name:|Warning|Failed|Back-off" || true
+          kubectl -n "$NAMESPACE" logs deployment/backend --tail=50 || true
