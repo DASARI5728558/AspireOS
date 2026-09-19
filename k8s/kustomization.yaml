@@ -13,7 +13,7 @@ resources:
   - ingress.yaml
   
 images:
-  - name: registry.utho.com/aspireos/aspireos-backend
+  - name: registry.utho.com/asperiondigital/aspireos-backend
     newTag: latest
-  - name: registry.utho.com/aspireos/aspireos-frontend
+  - name: registry.utho.com/asperiondigital/aspireos-frontend
     newTag: latest
